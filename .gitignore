@@ -1,6 +1,40 @@
-
+# Build
 bin/
 obj/
 
-/.vscode/
-/.idea/
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio
+.vs/
+.vscode/
+
+# Rider
+.idea/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# NuGet
+*.nupkg
+packages/
+
+# Redis dump (если вдруг появится)
+dump.rdb
+
+# Docker
+docker-compose.override.yml
+
+# Publish
+publish/
+
+# Temp
+*.tmp
+*.temp
