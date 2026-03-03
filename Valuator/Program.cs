@@ -1,8 +1,5 @@
-<<<<<<< HEAD
-=======
 using StackExchange.Redis;
 
->>>>>>> pa1
 namespace Valuator;
 
 public class Program
@@ -11,16 +8,12 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-<<<<<<< HEAD
-        // Add services to the container.
-=======
-        // Add services to the container. Добавил
+        // Add services to the container. пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
             ConnectionMultiplexer.Connect(
         builder.Configuration.GetConnectionString("Redis") 
         ));
 
->>>>>>> pa1
         builder.Services.AddRazorPages();
 
         var app = builder.Build();
