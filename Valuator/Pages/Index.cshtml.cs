@@ -59,7 +59,7 @@ public class IndexModel : PageModel
                 (c >= 'a' && c <= 'z') ||
                 (c >= 'A' && c <= 'Z') ||
                 (c >= 'а' && c <= 'я') ||
-                (c >= 'А' && c <= 'Я')
+                (c >= 'А' && c <= 'Я') || (c == 'ё') || (c == 'Ё')
              ));
 
         return (double)nonAlphabetic / total;
