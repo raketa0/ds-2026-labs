@@ -2,6 +2,8 @@
 @model IndexModel
 @{
     ViewData["Title"] = "Главная";
+    var port = HttpContext.Connection.LocalPort;
+    Console.WriteLine($"Server port: {port}");
 }
 
 <div class="text-center">
