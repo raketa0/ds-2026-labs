@@ -8,10 +8,10 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // Add services to the container. �������
+        // Add services to the container. �
         builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
             ConnectionMultiplexer.Connect(
-        builder.Configuration.GetConnectionString("Redis") 
+        builder.Configuration.GetConnectionString("Redis")
         ));
 
         builder.Services.AddRazorPages();

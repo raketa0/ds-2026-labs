@@ -1,6 +1,11 @@
+using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using StackExchange.Redis;
+using System.Text;
+using System.Text.Json;
+using RabbitMQ.Client;
+
 
 namespace Valuator.Pages;
 
@@ -35,34 +40,25 @@ public class IndexModel : PageModel
         string textKey = "TEXT-" + id;
         // TODO: (pa1) сохранить в БД (Redis) text по ключу textKey
 
-        string rankKey = "RANK-" + id;
-        double rank = CalculateRank(text);
-        db.StringSet(rankKey, rank.ToString());
-        // TODO: (pa1) посчитать rank и сохранить в БД (Redis) по ключу rankKey
-
         string similarityKey = "SIMILARITY-" + id;
         double similarity = CalculateSimilarity(text, db);
         db.StringSet(similarityKey, similarity.ToString());
         // TODO: (pa1) посчитать similarity и сохранить в БД (Redis) по ключу similarityKey
 
+        var factory = new ConnectionFactory() { HostName = "localhost" };
+
+        using var connection = factory.CreateConnection();
+        using var channel = connection.CreateModel();
+
+        var message = JsonSerializer.Serialize(new { Id = id });
+        var body = Encoding.UTF8.GetBytes(message);
+
+        channel.BasicPublish("", "rank_queue", null, body);
+
+
 
         db.StringSet(textKey, text);
         return Redirect($"summary?id={id}");
-    }
-
-    private double CalculateRank(string text)
-    {
-        int total = text.Length;
-
-        int nonAlphabetic = text.Count(c =>
-            !(
-                (c >= 'a' && c <= 'z') ||
-                (c >= 'A' && c <= 'Z') ||
-                (c >= 'а' && c <= 'я') ||
-                (c >= 'А' && c <= 'Я') || (c == 'ё') || (c == 'Ё')
-             ));
-
-        return (double)nonAlphabetic / total;
     }
 
     private double CalculateSimilarity(string text, IDatabase db)
