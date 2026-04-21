@@ -1,3 +1,4 @@
+using RabbitMQ.Client;
 using StackExchange.Redis;
 
 namespace Valuator;
@@ -13,6 +14,16 @@ public class Program
             ConnectionMultiplexer.Connect(
         builder.Configuration.GetConnectionString("Redis")
         ));
+
+        builder.Services.AddSingleton<IConnection>(sp =>
+        {
+            var factory = new ConnectionFactory()
+            {
+                HostName = "localhost"
+            };
+
+            return factory.CreateConnection();
+        });
 
         builder.Services.AddRazorPages();
 

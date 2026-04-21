@@ -1,0 +1,83 @@
+﻿using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
+using StackExchange.Redis;
+using System.Text;
+using System.Text.Json;
+
+namespace RankCalculator;
+
+public class RankProcessor
+{
+    private readonly IModel _channel;
+    private readonly IDatabase _db;
+
+    private record Message(string Id);
+    private record RankCalculatedEvent(string Id, double Rank);
+
+    public RankProcessor(IModel channel, IDatabase db)
+    {
+        _channel = channel;
+        _db = db;
+        _channel.ExchangeDeclare("events_exchange", ExchangeType.Fanout);
+    }
+
+    public void Handle(object? sender, BasicDeliverEventArgs ea)
+    {
+        var json = Encoding.UTF8.GetString(ea.Body.ToArray());
+        var msg = JsonSerializer.Deserialize<Message>(json);
+
+        if (msg == null)
+        {
+            return;
+        }
+
+        Console.WriteLine($"Processing {msg.Id}");
+
+        var text = _db.StringGet("TEXT-" + msg.Id);
+
+        double rank = CalculateRank(text!);
+
+        _db.StringSet("RANK-" + msg.Id, rank.ToString());
+
+        Console.WriteLine($"Done {msg.Id}, rank={rank}");
+
+        PublishEvent(msg.Id, rank);
+    }
+
+    private void PublishEvent(string id, double rank)
+    {
+        var evt = new RankCalculatedEvent(id, rank);
+
+        var json = JsonSerializer.Serialize(new
+        {
+            Type = "RankCalculated",
+            Id = evt.Id,
+            Rank = evt.Rank
+        });
+
+        var body = Encoding.UTF8.GetBytes(json);
+
+        _channel.BasicPublish(
+            exchange: "events_exchange",
+            routingKey: "",
+            basicProperties: null,
+            body: body
+        );
+    }
+
+    private double CalculateRank(string text)
+    {
+        int total = text.Length;
+
+        int nonAlphabetic = text.Count(c =>
+            !(
+                (c >= 'a' && c <= 'z') ||
+                (c >= 'A' && c <= 'Z') ||
+                (c >= 'а' && c <= 'я') ||
+                (c >= 'А' && c <= 'Я') ||
+                (c == 'ё') || (c == 'Ё')
+            ));
+
+        return (double)nonAlphabetic / total;
+    }
+}
