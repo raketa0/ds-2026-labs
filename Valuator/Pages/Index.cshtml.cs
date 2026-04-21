@@ -44,6 +44,7 @@ public class IndexModel : PageModel
         double similarity = CalculateSimilarity(text, db);
         db.StringSet(similarityKey, similarity.ToString());
         // TODO: (pa1) посчитать similarity и сохранить в БД (Redis) по ключу similarityKey
+        db.StringSet(textKey, text);
 
         var factory = new ConnectionFactory() { HostName = "localhost" };
 
@@ -57,7 +58,7 @@ public class IndexModel : PageModel
 
 
 
-        db.StringSet(textKey, text);
+       
         return Redirect($"summary?id={id}");
     }
 
