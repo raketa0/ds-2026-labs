@@ -72,8 +72,6 @@ public class IndexModel : PageModel
     {
         using var channel = _rabbitConnection.CreateModel();
 
-        channel.ExchangeDeclare("events_exchange", ExchangeType.Fanout);
-
         var evt = new SimilarityCalculatedEvent(id, similarity);
 
         var json = JsonSerializer.Serialize(new
