@@ -1,4 +1,5 @@
-﻿using RabbitMQ.Client;
+﻿using Common.Events;
+using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using StackExchange.Redis;
 using System.Text;
@@ -12,7 +13,6 @@ public class RankProcessor
     private readonly IDatabase _db;
 
     private record Message(string Id);
-    private record RankCalculatedEvent(string Id, double Rank);
 
     public RankProcessor(IModel channel, IDatabase db)
     {
@@ -46,22 +46,21 @@ public class RankProcessor
 
     private void PublishEvent(string id, double rank)
     {
-        var evt = new RankCalculatedEvent(id, rank);
-
-        var json = JsonSerializer.Serialize(new
+        var eventTypes = new EventTypes();
+        var message = new EventMessage
         {
-            Type = "RankCalculated",
-            Id = evt.Id,
-            Rank = evt.Rank
-        });
+            Type = eventTypes.RankCalculated,
+            Id = id,
+            Rank = rank
+        };
 
-        var body = Encoding.UTF8.GetBytes(json);
+        var json = JsonSerializer.Serialize(message);
 
         _channel.BasicPublish(
             exchange: "events_exchange",
             routingKey: "",
             basicProperties: null,
-            body: body
+            body: Encoding.UTF8.GetBytes(json)
         );
     }
 

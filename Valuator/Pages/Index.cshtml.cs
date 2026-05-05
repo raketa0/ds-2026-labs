@@ -5,7 +5,7 @@ using StackExchange.Redis;
 using System.Text;
 using System.Text.Json;
 using RabbitMQ.Client;
-
+using Common.Events;
 
 namespace Valuator.Pages;
 
@@ -15,7 +15,6 @@ public class IndexModel : PageModel
     private readonly IConnectionMultiplexer _redis;
     private readonly IConnection _rabbitConnection;
 
-    private record SimilarityCalculatedEvent(string Id, double Similarity);
 
     public IndexModel(ILogger<IndexModel> logger, IConnectionMultiplexer redis, IConnection rabbitConnection)
     {
@@ -72,14 +71,18 @@ public class IndexModel : PageModel
     {
         using var channel = _rabbitConnection.CreateModel();
 
-        var evt = new SimilarityCalculatedEvent(id, similarity);
+        channel.ExchangeDeclare("events_exchange", ExchangeType.Fanout);
 
-        var json = JsonSerializer.Serialize(new
+        var eventType = new EventTypes();
+
+        var message = new EventMessage
         {
-            Type = "SimilarityCalculated",
-            Id = evt.Id,
-            Similarity = evt.Similarity
-        });
+            Type = eventType.SimilarityCalculated,
+            Id = id,
+            Similarity = similarity
+        };
+
+        var json = JsonSerializer.Serialize(message);
 
         channel.BasicPublish(
             exchange: "events_exchange",

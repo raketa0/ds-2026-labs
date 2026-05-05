@@ -1,4 +1,5 @@
-﻿using RabbitMQ.Client;
+﻿using Common.Events;
+using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
@@ -32,31 +33,19 @@ public class EventsLogger
         consumer.Received += (sender, ea) =>
         {
             var json = Encoding.UTF8.GetString(ea.Body.ToArray());
-            using var doc = JsonDocument.Parse(json);
+            var msg = JsonSerializer.Deserialize<EventMessage>(json);
 
-            var type = doc.RootElement.GetProperty("Type").GetString();
-            var id = doc.RootElement.GetProperty("Id").GetString();
-
-            switch (type)
+            if (msg.Type == "RankCalculated")
             {
-                case "RankCalculated":
-                    var rank = doc.RootElement.GetProperty("Rank").GetDouble();
-                    Console.WriteLine($"RankCalculated | Id={id} | Rank={rank}");
-                    break;
-
-                case "SimilarityCalculated":
-                    var sim = doc.RootElement.GetProperty("Similarity").GetDouble();
-                    Console.WriteLine($"SimilarityCalculated | Id={id} | Similarity={sim}");
-                    break;
+                Console.WriteLine($"RankCalculated | Id={msg.Id} | Rank={msg.Rank}");
+            }
+            else if (msg.Type == "SimilarityCalculated")
+            {
+                Console.WriteLine($"SimilarityCalculated | Id={msg.Id} | Similarity={msg.Similarity}");
             }
         };
 
-        channel.BasicConsume(
-            queue: queueName,
-            autoAck: true,
-            consumer: consumer
-        );
-
+        channel.BasicConsume(queueName, true, consumer);
 
         Console.WriteLine("EventsLogger started...");
         Console.ReadLine();
