@@ -21,25 +21,24 @@ public class RankProcessor
         _channel.ExchangeDeclare("events_exchange", ExchangeType.Fanout);
     }
 
-    public void Handle(object? sender, BasicDeliverEventArgs ea)
+    public async void Handle(object? sender, BasicDeliverEventArgs ea)
     {
         var json = Encoding.UTF8.GetString(ea.Body.ToArray());
         var msg = JsonSerializer.Deserialize<Message>(json);
 
-        if (msg == null)
-        {
-            return;
-        }
+        if (msg == null) return;
 
         Console.WriteLine($"Processing {msg.Id}");
+
+        TimeSpan interval = TimeSpan.FromSeconds(new Random().Next(3, 15));
+        Console.WriteLine($"Waiting {interval}");
+        await Task.Delay(interval);
 
         var text = _db.StringGet("TEXT-" + msg.Id);
 
         double rank = CalculateRank(text!);
 
         _db.StringSet("RANK-" + msg.Id, rank.ToString());
-
-        Console.WriteLine($"Done {msg.Id}, rank={rank}");
 
         PublishEvent(msg.Id, rank);
     }

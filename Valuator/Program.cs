@@ -1,5 +1,7 @@
 using RabbitMQ.Client;
 using StackExchange.Redis;
+using Valuator.Hubs;
+using Valuator.Services;
 
 namespace Valuator;
 
@@ -9,15 +11,13 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // Add services to the container. �
-        builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-            ConnectionMultiplexer.Connect(
-        builder.Configuration.GetConnectionString("Redis")
-        ));
+        var redis = ConnectionMultiplexer.Connect("localhost");
+
+        builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
 
         builder.Services.AddSingleton<IConnection>(sp =>
         {
-            var factory = new ConnectionFactory()
+            var factory = new ConnectionFactory
             {
                 HostName = "localhost"
             };
@@ -27,13 +27,18 @@ public class Program
 
         builder.Services.AddRazorPages();
 
+        builder.Services.AddSignalR()
+            .AddStackExchangeRedis("localhost");
+
+        builder.Services.AddHostedService<EventListener>();
+
         var app = builder.Build();
 
-        // Configure the HTTP request pipeline.
         if (!app.Environment.IsDevelopment())
         {
             app.UseExceptionHandler("/Error");
         }
+
         app.UseStaticFiles();
 
         app.UseRouting();
@@ -41,6 +46,8 @@ public class Program
         app.UseAuthorization();
 
         app.MapRazorPages();
+
+        app.MapHub<SummaryHub>("/summaryHub");
 
         app.Run();
     }

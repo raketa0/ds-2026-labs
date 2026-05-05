@@ -1,6 +1,33 @@
 ﻿@page
 @model Valuator.Pages.SummaryModel
-@{
-}
-<p>Оценка содержания: @Model.Rank</p>
-<p>Плагиат: @Model.Similarity</p>
+
+<p>Оценка содержания: <span id="rank">@Model.Rank</span></p>
+<p>Плагиат: <span id="similarity">@Model.Similarity</span></p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
+
+<script>
+    const id = new URLSearchParams(window.location.search).get("id");
+
+    const connection = new signalR.HubConnectionBuilder()
+    .withUrl("/summaryHub")
+    .build();
+
+    connection.start().then(() => {
+    console.log("Connected to SignalR");
+
+    connection.invoke("SubscribeToRankUpdate", id);
+    });
+
+    connection.on("ReceiveUpdate", (msg) => {
+    console.log("Update:", msg);
+
+    if (msg.type === "RankCalculated") {
+    document.getElementById("rank").innerText = msg.rank;
+    }
+
+    if (msg.type === "SimilarityCalculated") {
+    document.getElementById("similarity").innerText = msg.similarity;
+    }
+    });
+</script>
