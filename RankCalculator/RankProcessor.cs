@@ -10,57 +10,91 @@ namespace RankCalculator;
 public class RankProcessor
 {
     private readonly IModel _channel;
-    private readonly IDatabase _db;
+
+    private readonly ConnectionMultiplexer _mainRedis;
+
+    private readonly Dictionary<string, ConnectionMultiplexer> _shards;
 
     private record Message(string Id);
 
-    public RankProcessor(IModel channel, IDatabase db)
+    public RankProcessor(IModel channel)
     {
         _channel = channel;
-        _db = db;
+
         _channel.ExchangeDeclare("events_exchange", ExchangeType.Fanout);
+
+        _mainRedis = ConnectionMultiplexer.Connect(
+            Environment.GetEnvironmentVariable("DB_MAIN")
+            ?? "localhost:6000"
+        );
+
+        _shards = new Dictionary<string, ConnectionMultiplexer>
+        {
+            {
+                "RU",
+                ConnectionMultiplexer.Connect(
+                    Environment.GetEnvironmentVariable("DB_RU")
+                    ?? "localhost:6001"
+                )
+            },
+
+            {
+                "EU",
+                ConnectionMultiplexer.Connect(
+                    Environment.GetEnvironmentVariable("DB_EU")
+                    ?? "localhost:6002"
+                )
+            },
+
+            {
+                "ASIA",
+                ConnectionMultiplexer.Connect(
+                    Environment.GetEnvironmentVariable("DB_ASIA")
+                    ?? "localhost:6003"
+                )
+            }
+        };
     }
 
     public void Handle(object? sender, BasicDeliverEventArgs ea)
     {
-        var json = Encoding.UTF8.GetString(ea.Body.ToArray());
-        var msg = JsonSerializer.Deserialize<Message>(json);
+        var msg = JsonSerializer.Deserialize<Message>(
+            Encoding.UTF8.GetString(ea.Body.ToArray())
+        );
 
-        if (msg == null)
-        {
-            return;
-        }
 
-        Console.WriteLine($"Processing {msg.Id}");
+        var mainDb = _mainRedis.GetDatabase();
 
-        var text = _db.StringGet("TEXT-" + msg.Id);
+        string shard = mainDb.StringGet($"TEXT-SHARD-{msg.Id}");
+
+        Console.WriteLine($"LOOKUP: {msg.Id}, {shard}");
+
+        var db = _shards[shard].GetDatabase();
+
+        var text = db.StringGet("TEXT-" + msg.Id);
 
         double rank = CalculateRank(text!);
 
-        _db.StringSet("RANK-" + msg.Id, rank.ToString());
+        db.StringSet("RANK-" + msg.Id, rank.ToString());
 
-        Console.WriteLine($"Done {msg.Id}, rank={rank}");
-
-        PublishEvent(msg.Id, rank);
+        PublishEvent(msg.Id, shard, rank);
     }
 
-    private void PublishEvent(string id, double rank)
+    private void PublishEvent(string id, string shard, double rank)
     {
-        var eventTypes = new EventTypes();
-        var message = new EventMessage
+        var evt = new EventMessage
         {
-            Type = eventTypes.RankCalculated,
+            Type = new EventTypes().RankCalculated,
             Id = id,
+            Shard = shard,
             Rank = rank
         };
 
-        var json = JsonSerializer.Serialize(message);
-
         _channel.BasicPublish(
-            exchange: "events_exchange",
-            routingKey: "",
-            basicProperties: null,
-            body: Encoding.UTF8.GetBytes(json)
+            "events_exchange",
+            "",
+            null,
+            Encoding.UTF8.GetBytes(JsonSerializer.Serialize(evt))
         );
     }
 
@@ -74,7 +108,8 @@ public class RankProcessor
                 (c >= 'A' && c <= 'Z') ||
                 (c >= 'а' && c <= 'я') ||
                 (c >= 'А' && c <= 'Я') ||
-                (c == 'ё') || (c == 'Ё')
+                (c == 'ё') ||
+                (c == 'Ё')
             ));
 
         return (double)nonAlphabetic / total;

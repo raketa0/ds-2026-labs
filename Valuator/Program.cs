@@ -9,11 +9,44 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // Add services to the container. �
         builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-            ConnectionMultiplexer.Connect(
-        builder.Configuration.GetConnectionString("Redis")
-        ));
+        {
+            string mainConnection =
+                Environment.GetEnvironmentVariable("DB_MAIN")
+                ?? "localhost:6000";
+
+            return ConnectionMultiplexer.Connect(mainConnection);
+        });
+
+        builder.Services.AddSingleton<Dictionary<string, IConnectionMultiplexer>>(sp =>
+        {
+            return new Dictionary<string, IConnectionMultiplexer>
+            {
+                {
+                    "RU",
+                    ConnectionMultiplexer.Connect(
+                        Environment.GetEnvironmentVariable("DB_RU")
+                        ?? "localhost:6001"
+                    )
+                },
+
+                {
+                    "EU",
+                    ConnectionMultiplexer.Connect(
+                        Environment.GetEnvironmentVariable("DB_EU")
+                        ?? "localhost:6002"
+                    )
+                },
+
+                {
+                    "ASIA",
+                    ConnectionMultiplexer.Connect(
+                        Environment.GetEnvironmentVariable("DB_ASIA")
+                        ?? "localhost:6003"
+                    )
+                }
+            };
+        });
 
         builder.Services.AddSingleton<IConnection>(sp =>
         {
@@ -29,11 +62,11 @@ public class Program
 
         var app = builder.Build();
 
-        // Configure the HTTP request pipeline.
         if (!app.Environment.IsDevelopment())
         {
             app.UseExceptionHandler("/Error");
         }
+
         app.UseStaticFiles();
 
         app.UseRouting();

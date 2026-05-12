@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using StackExchange.Redis;
@@ -12,14 +11,22 @@ namespace Valuator.Pages;
 public class IndexModel : PageModel
 {
     private readonly ILogger<IndexModel> _logger;
-    private readonly IConnectionMultiplexer _redis;
+
+    private readonly IConnectionMultiplexer _mainRedis;
+
+    private readonly Dictionary<string, IConnectionMultiplexer> _shards;
+
     private readonly IConnection _rabbitConnection;
 
-
-    public IndexModel(ILogger<IndexModel> logger, IConnectionMultiplexer redis, IConnection rabbitConnection)
+    public IndexModel(
+        ILogger<IndexModel> logger,
+        IConnectionMultiplexer mainRedis,
+        Dictionary<string, IConnectionMultiplexer> shards,
+        IConnection rabbitConnection)
     {
         _logger = logger;
-        _redis = redis;
+        _mainRedis = mainRedis;
+        _shards = shards;
         _rabbitConnection = rabbitConnection;
     }
 
@@ -28,7 +35,7 @@ public class IndexModel : PageModel
 
     }
 
-    public IActionResult OnPost(string text)
+    public IActionResult OnPost(string text, string country)
     {
         _logger.LogDebug(text);
 
@@ -37,20 +44,36 @@ public class IndexModel : PageModel
             return RedirectToPage();
         }
 
+        string shard = country switch
+        {
+            "Russia" => "RU",
+            "France" => "EU",
+            "Germany" => "EU",
+            "UAE" => "ASIA",
+            "India" => "ASIA"
+        };
+
         string id = Guid.NewGuid().ToString();
-        var db = _redis.GetDatabase();
+
+        var mainDb = _mainRedis.GetDatabase();
+
+        mainDb.StringSet($"TEXT-SHARD-{id}", shard);
+
+        var db = _shards[shard].GetDatabase();
 
         string textKey = "TEXT-" + id;
-        // TODO: (pa1) сохранить в БД (Redis) text по ключу textKey
 
         string similarityKey = "SIMILARITY-" + id;
+
         double similarity = CalculateSimilarity(text, db);
+
         db.StringSet(similarityKey, similarity.ToString());
-        // TODO: (pa1) посчитать similarity и сохранить в БД (Redis) по ключу similarityKey
+
         db.StringSet(textKey, text);
 
         PublishRankRequest(id);
-        PublishSimilarityEvent(id, similarity);
+
+        PublishSimilarityEvent(id, similarity, shard);
 
         return Redirect($"summary?id={id}");
     }
@@ -62,46 +85,49 @@ public class IndexModel : PageModel
         channel.QueueDeclare("rank_queue", false, false, false);
 
         var message = JsonSerializer.Serialize(new { Id = id });
+
         var body = Encoding.UTF8.GetBytes(message);
 
         channel.BasicPublish("", "rank_queue", null, body);
     }
 
-    private void PublishSimilarityEvent(string id, double similarity)
+    private void PublishSimilarityEvent(string id, double similarity, string shard)
     {
         using var channel = _rabbitConnection.CreateModel();
-
         channel.ExchangeDeclare("events_exchange", ExchangeType.Fanout);
 
-        var eventType = new EventTypes();
-
-        var message = new EventMessage
+        var evt = new EventMessage
         {
-            Type = eventType.SimilarityCalculated,
+            Type = new EventTypes().SimilarityCalculated,
             Id = id,
+            Shard = shard,
             Similarity = similarity
         };
 
-        var json = JsonSerializer.Serialize(message);
-
         channel.BasicPublish(
-            exchange: "events_exchange",
-            routingKey: "",
-            basicProperties: null,
-            body: Encoding.UTF8.GetBytes(json)
+            "events_exchange",
+            "",
+            null,
+            Encoding.UTF8.GetBytes(JsonSerializer.Serialize(evt))
         );
     }
 
     private double CalculateSimilarity(string text, IDatabase db)
     {
-        var server = _redis.GetServer(_redis.GetEndPoints().First());
+        var server = db.Multiplexer.GetServer(
+            db.Multiplexer.GetEndPoints().First()
+        );
+
         var keys = server.Keys(pattern: "TEXT-*");
 
         foreach (var key in keys)
         {
             var existingText = db.StringGet(key);
+
             if (existingText == text)
+            {
                 return 1;
+            }
         }
 
         return 0;

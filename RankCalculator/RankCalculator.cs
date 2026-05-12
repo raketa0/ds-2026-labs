@@ -18,10 +18,7 @@ public class RankCalculator
 
         channel.QueueDeclare("rank_queue", false, false, false);
 
-        using var redis = ConnectionMultiplexer.Connect("localhost");
-        var db = redis.GetDatabase();
-
-        var processor = new RankProcessor(channel, db);
+        var processor = new RankProcessor(channel);
 
         var consumer = new EventingBasicConsumer(channel);
         consumer.Received += processor.Handle;

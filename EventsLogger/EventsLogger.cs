@@ -26,7 +26,6 @@ public class EventsLogger
             routingKey: ""
         );
 
-        var processor = new EventProcessor();
 
         var consumer = new EventingBasicConsumer(channel);
 
@@ -37,11 +36,11 @@ public class EventsLogger
 
             if (msg.Type == "RankCalculated")
             {
-                Console.WriteLine($"RankCalculated | Id={msg.Id} | Rank={msg.Rank}");
+                Console.WriteLine($"RankCalculated | Id={msg.Id} | Rank={msg.Rank} | Shard={msg.Shard}");
             }
             else if (msg.Type == "SimilarityCalculated")
             {
-                Console.WriteLine($"SimilarityCalculated | Id={msg.Id} | Similarity={msg.Similarity}");
+                Console.WriteLine($"SimilarityCalculated | Id={msg.Id} | Similarity={msg.Similarity} | Shard={msg.Shard}");
             }
         };
 
