@@ -66,6 +66,7 @@ public class RankProcessor
         var mainDb = _mainRedis.GetDatabase();
 
         string shard = mainDb.StringGet($"TEXT-SHARD-{msg.Id}");
+        // что будет есди не дождемся подключение к бд
 
         Console.WriteLine($"LOOKUP: {msg.Id}, {shard}");
 

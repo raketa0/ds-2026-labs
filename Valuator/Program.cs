@@ -5,6 +5,7 @@ namespace Valuator;
 
 public class Program
 {
+    //cоответсвие объяснить
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);

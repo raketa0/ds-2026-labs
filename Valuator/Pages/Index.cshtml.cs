@@ -50,7 +50,8 @@ public class IndexModel : PageModel
             "France" => "EU",
             "Germany" => "EU",
             "UAE" => "ASIA",
-            "India" => "ASIA"
+            "India" => "ASIA",
+            _ => throw new NotImplementedException()
         };
 
         string id = Guid.NewGuid().ToString();
